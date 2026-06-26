@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { AnimateOnScroll } from "@/components/effects/animate-on-scroll";
-import { ArrowRight, Target, Eye, Lightbulb, Shield } from "lucide-react";
+import { ArrowRight, Target, Eye, Lightbulb, Shield, Building2 } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "About — REOS",
@@ -111,7 +111,7 @@ export default function AboutPage() {
                   Listing portals generate leads but share them with 5-10 agents. No tool covers the full lifecycle,
                   and none of them give you a website.
                 </p>
-                <p className="text-foreground font-bold text-lg border-l-4 border-primary pl-4">
+                <p className="text-foreground font-bold text-lg bg-primary/8 px-4 py-3">
                   REOS solves this by being two things at once: a dashboard companies manage their business with,
                   and a branded website their customers see. One system, from lead capture through possession.
                 </p>
@@ -159,7 +159,8 @@ export default function AboutPage() {
                 { n: "01", label: "Research Phase", detail: "6 phases completed — literature survey, existing system analysis, comparison, proposed system, technology stack, project plan." },
                 { n: "02", label: "Core Implementation", detail: "7 steps — agent CRUD, analytics, compliance, documents, settings, booking/payments, Supabase sync. 17 routes, 0 build errors." },
                 { n: "03", label: "Multi-Tenant Architecture", detail: "Pivoted to SaaS — shared database with tenant isolation, hostname routing, per-company branded websites." },
-                { n: "04", label: "What's Next", detail: "Authentication, production security, WhatsApp integration, offline support, AI intelligence layer." },
+                { n: "04", label: "First Live Deployment", detail: "Vision Infra Tech goes live — real inventory, real leads, real CRM. Our first company running on REOS in production." },
+                { n: "05", label: "What's Next", detail: "WhatsApp integration, offline support, payment gateway, AI lead scoring, and onboarding more clients." },
               ].map((m, i) => (
                 <AnimateOnScroll key={m.n} animation="fade-up" delay={i * 0.1}>
                   <div className="flex items-start gap-4">
@@ -174,6 +175,57 @@ export default function AboutPage() {
                 </AnimateOnScroll>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FIRST CLIENT */}
+      <section className="py-20 md:py-28 border-t-3 border-foreground/10">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl">
+            <AnimateOnScroll animation="fade-up">
+              <div className="inline-block border-2 border-primary bg-primary/10 px-4 py-1.5 mb-6 brutal-shadow-red">
+                <span className="text-xs font-black uppercase tracking-widest text-primary">Live Now</span>
+              </div>
+              <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight mb-8">Our First Deal</h2>
+            </AnimateOnScroll>
+            <AnimateOnScroll animation="fade-up" delay={0.1}>
+              <div className="brutal-card bg-card p-6 mb-8">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-primary flex items-center justify-center shrink-0 brutal-shadow">
+                    <Building2 className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg uppercase tracking-wide mb-3">Vision Infra Tech</h3>
+                    <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+                      <p>
+                        Vision Infra Tech is our first live client — a Hyderabad-based real estate developer
+                        managing plots, villas, and commercial spaces across the city&apos;s high-growth corridors.
+                        They came to us with inventory scattered across spreadsheets and leads tracked on WhatsApp.
+                        Now their entire operation runs through REOS.
+                      </p>
+                      <p>
+                        We built their branded public website, seeded 84 properties across 3 projects, wired
+                        their lead capture directly into the CRM, and gave their team a dashboard for bookings,
+                        documents, and compliance — all under their brand, all in one system.
+                      </p>
+                    </div>
+                    <a
+                      href="https://vision-infra-tech-thlq.vercel.app"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 mt-4 text-sm font-bold text-primary hover:underline uppercase tracking-wide"
+                    >
+                      Visit their website <ArrowRight className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+              <p className="text-muted-foreground leading-relaxed font-medium text-lg">
+                This is deal one. The system is real, the data is real, the client is real.
+                Everything from here is scale.
+              </p>
+            </AnimateOnScroll>
           </div>
         </div>
       </section>
