@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { AnimatedCounter } from "@/components/dashboard/animated-counter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,6 @@ import {
   Users,
   ArrowRightLeft,
   ClipboardCheck,
-  Megaphone,
 } from "lucide-react";
 import { useDemoStore } from "@/lib/demo-store";
 import {
@@ -42,12 +42,12 @@ import {
 import type { ComplianceChecklistItem } from "@/lib/constants";
 
 const STAGE_LABELS: Record<string, { label: string; color: string }> = {
-  setup: { label: "Project Setup", color: "text-blue-600 dark:text-blue-400" },
-  marketing: { label: "Marketing", color: "text-violet-600 dark:text-violet-400" },
-  booking: { label: "Booking", color: "text-amber-600 dark:text-amber-400" },
-  registration: { label: "Registration", color: "text-orange-600 dark:text-orange-400" },
-  possession: { label: "Possession", color: "text-emerald-600 dark:text-emerald-400" },
-  ongoing: { label: "Ongoing", color: "text-cyan-600 dark:text-cyan-400" },
+  setup:        { label: "Project Setup",  color: "text-blue-600 dark:text-blue-400" },
+  marketing:    { label: "Marketing",      color: "text-primary" },
+  booking:      { label: "Booking",        color: "text-amber-600 dark:text-amber-400" },
+  registration: { label: "Registration",   color: "text-orange-600 dark:text-orange-400" },
+  possession:   { label: "Possession",     color: "text-emerald-600 dark:text-emerald-400" },
+  ongoing:      { label: "Ongoing",        color: "text-teal-600 dark:text-teal-400" },
 };
 
 const STAGE_ORDER = ["setup", "marketing", "booking", "registration", "possession", "ongoing"];
@@ -90,9 +90,9 @@ function ChecklistSection({
           <span className="text-xs text-muted-foreground">
             {done}/{total} mandatory
           </span>
-          <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
+          <div className="w-24 h-2 bg-muted overflow-hidden">
             <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+              className="h-full bg-emerald-500 transition-all duration-500"
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -116,7 +116,7 @@ function ChecklistSection({
                 return (
                   <div
                     key={`${item.document_type}-${item.stage}`}
-                    className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                    className={`flex items-start gap-3 p-3 border transition-colors ${
                       uploaded
                         ? "border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/10"
                         : item.mandatory
@@ -221,6 +221,55 @@ export default function CompliancePage() {
   const expiredDocs = projectDocs.filter(
     (d) => d.expiry_date && new Date(d.expiry_date) < new Date()
   ).length;
+  const alertCount = nonReraProjects.length + expiredDocs;
+
+  const kpiCards = [
+    {
+      label: "RERA Registered",
+      value: reraProjects.length,
+      sub: `of ${store.projects.length} projects`,
+      suffix: "",
+      icon: ShieldCheck,
+      accent: "text-emerald-600 dark:text-emerald-400",
+      border: "border-emerald-500/20",
+      bg: "bg-emerald-500/5",
+    },
+    {
+      label: "Compliance Score",
+      value: overallPct,
+      sub: `${completedMandatory}/${totalMandatory} mandatory docs`,
+      suffix: "%",
+      icon: FileCheck,
+      accent: "text-primary",
+      border: "border-primary/20",
+      bg: "bg-primary/5",
+    },
+    {
+      label: "Verified Documents",
+      value: verifiedDocs,
+      sub: `${pendingDocs} pending review`,
+      suffix: "",
+      icon: CheckCircle2,
+      accent: "text-blue-600 dark:text-blue-400",
+      border: "border-blue-500/20",
+      bg: "bg-blue-500/5",
+    },
+    {
+      label: "Alerts",
+      value: alertCount,
+      sub: alertCount === 0
+        ? "All clear"
+        : [
+            nonReraProjects.length > 0 && `${nonReraProjects.length} unregistered`,
+            expiredDocs > 0 && `${expiredDocs} expired`,
+          ].filter(Boolean).join(", "),
+      suffix: "",
+      icon: AlertTriangle,
+      accent: alertCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
+      border: alertCount > 0 ? "border-amber-500/20" : "border-border/50",
+      bg: alertCount > 0 ? "bg-amber-500/5" : "",
+    },
+  ];
 
   return (
     <>
@@ -230,58 +279,25 @@ export default function CompliancePage() {
       />
       <div className="p-4 space-y-6">
         {/* KPI Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">RERA Registered</CardTitle>
-              <ShieldCheck className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reraProjects.length}</div>
-              <p className="text-xs text-muted-foreground">
-                of {store.projects.length} projects
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {kpiCards.map((card, i) => (
+            <div
+              key={card.label}
+              className={`border ${card.border} ${card.bg} px-4 py-3.5 animate-fade-up`}
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {card.label}
+                </p>
+                <card.icon className={`w-4 h-4 ${card.accent}`} />
+              </div>
+              <p className={`text-2xl font-bold tabular-nums ${card.accent}`}>
+                <AnimatedCounter value={card.value} suffix={card.suffix} startDelay={i * 70} />
               </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Compliance Score</CardTitle>
-              <FileCheck className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overallPct}%</div>
-              <p className="text-xs text-muted-foreground">
-                {completedMandatory}/{totalMandatory} mandatory docs
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Verified Documents</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{verifiedDocs}</div>
-              <p className="text-xs text-muted-foreground">
-                {pendingDocs} pending review
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Alerts</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{nonReraProjects.length + expiredDocs}</div>
-              <p className="text-xs text-muted-foreground">
-                {nonReraProjects.length > 0 ? `${nonReraProjects.length} unregistered` : ""}
-                {nonReraProjects.length > 0 && expiredDocs > 0 ? ", " : ""}
-                {expiredDocs > 0 ? `${expiredDocs} expired` : ""}
-                {nonReraProjects.length === 0 && expiredDocs === 0 ? "All clear" : ""}
-              </p>
-            </CardContent>
-          </Card>
+              <p className="text-xs text-muted-foreground mt-1">{card.sub}</p>
+            </div>
+          ))}
         </div>
 
         {/* Project Selector */}
@@ -319,10 +335,8 @@ export default function CompliancePage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Pipeline Tab */}
           <TabsContent value="pipeline">
             <div className="space-y-6 pt-2">
-              {/* Project Documents Pipeline */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-base">Project Document Pipeline</CardTitle>
@@ -340,7 +354,6 @@ export default function CompliancePage() {
                 </CardContent>
               </Card>
 
-              {/* Buyer KYC Pipeline */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-base">Buyer KYC Checklist</CardTitle>
@@ -353,12 +366,11 @@ export default function CompliancePage() {
                     items={BUYER_DOCUMENT_CHECKLIST}
                     uploadedTypes={uploadedDocTypes}
                     title="Buyer Identity & Verification"
-                    icon={<Users className="w-4 h-4 text-violet-500" />}
+                    icon={<Users className="w-4 h-4 text-primary" />}
                   />
                 </CardContent>
               </Card>
 
-              {/* Transaction Document Pipeline */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-base">Transaction Document Pipeline</CardTitle>
@@ -378,7 +390,6 @@ export default function CompliancePage() {
             </div>
           </TabsContent>
 
-          {/* RERA Registry Tab */}
           <TabsContent value="registry">
             <div className="space-y-6 pt-2">
               <Card>
@@ -415,7 +426,7 @@ export default function CompliancePage() {
                         return (
                           <div
                             key={project.id}
-                            className="flex items-start justify-between p-4 rounded-lg border bg-card"
+                            className="flex items-start justify-between p-4 border bg-card"
                           >
                             <div className="space-y-1.5 flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -450,9 +461,9 @@ export default function CompliancePage() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 pt-1">
-                                <div className="w-32 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div className="w-32 h-1.5 bg-muted overflow-hidden">
                                   <div
-                                    className="h-full rounded-full bg-emerald-500 transition-all"
+                                    className="h-full bg-emerald-500 transition-all"
                                     style={{ width: `${projPct}%` }}
                                   />
                                 </div>
@@ -491,7 +502,7 @@ export default function CompliancePage() {
                       {nonReraProjects.map((project) => (
                         <div
                           key={project.id}
-                          className="flex items-center justify-between p-3 rounded-lg border border-amber-500/20 bg-amber-50/50 dark:bg-amber-950/10"
+                          className="flex items-center justify-between p-3 border border-amber-500/20 bg-amber-50/50 dark:bg-amber-950/10"
                         >
                           <div>
                             <p className="font-medium text-sm">{project.name}</p>
@@ -514,7 +525,6 @@ export default function CompliancePage() {
             </div>
           </TabsContent>
 
-          {/* Uploaded Documents Tab */}
           <TabsContent value="documents">
             <div className="space-y-4 pt-2">
               {projectDocs.length === 0 ? (
@@ -546,7 +556,7 @@ export default function CompliancePage() {
                         return (
                           <div
                             key={doc.id}
-                            className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                            className="flex items-center justify-between p-3 border bg-card"
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <FileText className="w-4 h-4 text-muted-foreground shrink-0" />

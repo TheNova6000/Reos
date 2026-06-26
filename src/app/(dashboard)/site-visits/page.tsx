@@ -3,8 +3,8 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { AnimatedCounter } from "@/components/dashboard/animated-counter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -181,23 +181,23 @@ const STATUS_STYLES: Record<VisitStatus, {
   upcoming: {
     label: "Upcoming",
     icon: Clock,
-    dot: "bg-violet-500",
-    card: "border-l-violet-500 bg-violet-500/5 hover:bg-violet-500/10",
-    badge: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
+    dot: "bg-amber-500",
+    card: "border-t-amber-500 bg-amber-500/5 hover:bg-amber-500/8",
+    badge: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
   },
   completed: {
     label: "Completed",
     icon: Check,
     dot: "bg-emerald-500",
-    card: "border-l-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10",
+    card: "border-t-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/8",
     badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
   },
   missed: {
     label: "Missed",
     icon: AlertCircle,
-    dot: "bg-amber-500",
-    card: "border-l-amber-500 bg-amber-500/5 hover:bg-amber-500/10",
-    badge: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
+    dot: "bg-rose-500",
+    card: "border-t-rose-500 bg-rose-500/5 hover:bg-rose-500/8",
+    badge: "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
   },
 };
 
@@ -238,6 +238,42 @@ export default function SiteVisitsPage() {
     return map;
   }, [store.projects]);
 
+  const statCards = [
+    {
+      count: upcoming.length,
+      label: "Upcoming",
+      sub: upcoming.length > 0
+        ? `Next: ${formatRelativeDate(
+            [...upcoming].sort((a, b) =>
+              new Date(a.scheduled_for!).getTime() - new Date(b.scheduled_for!).getTime()
+            )[0]?.scheduled_for || ""
+          )}`
+        : "None scheduled",
+      accent: "text-amber-600 dark:text-amber-400",
+      border: "border-amber-500/20",
+      bg: "bg-amber-500/5",
+      icon: Clock,
+    },
+    {
+      count: completed.length,
+      label: "Completed",
+      sub: "Site visits done",
+      accent: "text-emerald-600 dark:text-emerald-400",
+      border: "border-emerald-500/20",
+      bg: "bg-emerald-500/5",
+      icon: Check,
+    },
+    {
+      count: missed.length,
+      label: "Missed",
+      sub: missed.length > 0 ? "Need rescheduling" : "All on track",
+      accent: "text-rose-600 dark:text-rose-400",
+      border: "border-rose-500/20",
+      bg: "bg-rose-500/5",
+      icon: AlertCircle,
+    },
+  ];
+
   return (
     <>
       <DashboardHeader
@@ -246,45 +282,21 @@ export default function SiteVisitsPage() {
         actions={<ScheduleSiteVisitDialog />}
       />
       <div className="p-4 space-y-5">
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {[
-            {
-              count: upcoming.length,
-              label: "Upcoming",
-              sub: upcoming.length > 0
-                ? `Next: ${formatRelativeDate(upcoming.sort((a, b) => new Date(a.scheduled_for!).getTime() - new Date(b.scheduled_for!).getTime())[0]?.scheduled_for || "")}`
-                : "None scheduled",
-              color: "text-violet-600 dark:text-violet-400",
-              bg: "bg-violet-500/8 border-violet-500/15",
-              icon: Clock,
-            },
-            {
-              count: completed.length,
-              label: "Completed",
-              sub: "Site visits done",
-              color: "text-emerald-600 dark:text-emerald-400",
-              bg: "bg-emerald-500/8 border-emerald-500/15",
-              icon: Check,
-            },
-            {
-              count: missed.length,
-              label: "Missed",
-              sub: missed.length > 0 ? "Need rescheduling" : "All on track",
-              color: "text-amber-600 dark:text-amber-400",
-              bg: "bg-amber-500/8 border-amber-500/15",
-              icon: AlertCircle,
-            },
-          ].map((stat) => (
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          {statCards.map((stat, i) => (
             <div
               key={stat.label}
-              className={`rounded-xl border px-3 py-3 sm:p-4 transition-colors ${stat.bg}`}
+              className={`border ${stat.border} ${stat.bg} px-3 py-3 sm:px-4 animate-fade-up`}
+              style={{ animationDelay: `${i * 80}ms` }}
             >
-              <div className="flex items-center justify-between mb-1 sm:mb-2">
-                <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                <span className={`text-xl sm:text-2xl font-bold ${stat.color}`}>{stat.count}</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <stat.icon className={`w-4 h-4 ${stat.accent}`} />
+                <p className={`text-xl sm:text-2xl font-bold tabular-nums ${stat.accent}`}>
+                  <AnimatedCounter value={stat.count} startDelay={i * 80} />
+                </p>
               </div>
-              <p className="text-xs sm:text-sm font-medium">{stat.label}</p>
+              <p className="text-xs sm:text-sm font-semibold">{stat.label}</p>
               <p className="text-[11px] text-muted-foreground mt-0.5 hidden sm:block">{stat.sub}</p>
             </div>
           ))}
@@ -316,8 +328,8 @@ export default function SiteVisitsPage() {
               {/* Filter chips */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1 scrollbar-none">
                 {(["all", "upcoming", "completed", "missed"] as const).map((f) => {
-                  const count = f === "all"
-                    ? siteVisits.length
+                  const count =
+                    f === "all" ? siteVisits.length
                     : f === "upcoming" ? upcoming.length
                     : f === "completed" ? completed.length
                     : missed.length;
@@ -326,9 +338,9 @@ export default function SiteVisitsPage() {
                       key={f}
                       type="button"
                       onClick={() => setListFilter(f)}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all ${
                         listFilter === f
-                          ? "bg-primary text-primary-foreground shadow-sm"
+                          ? "bg-primary text-primary-foreground"
                           : "bg-muted/60 text-muted-foreground hover:bg-muted"
                       }`}
                     >
@@ -336,7 +348,7 @@ export default function SiteVisitsPage() {
                         <span className={`w-1.5 h-1.5 rounded-full ${STATUS_STYLES[f].dot}`} />
                       )}
                       {f === "all" ? "All" : STATUS_STYLES[f].label}
-                      <span className={`${listFilter === f ? "text-primary-foreground/70" : "text-muted-foreground/50"}`}>
+                      <span className={listFilter === f ? "text-primary-foreground/70" : "text-muted-foreground/50"}>
                         {count}
                       </span>
                     </button>
@@ -369,10 +381,10 @@ export default function SiteVisitsPage() {
                     return (
                       <div
                         key={visit.id}
-                        className={`group rounded-xl border border-l-[3px] p-3 sm:p-4 transition-all ${style.card}`}
+                        className={`group border border-t-2 p-3 sm:p-4 transition-all ${style.card}`}
                       >
                         <div className="flex items-start gap-3 sm:gap-4">
-                          {/* Date block — compact on mobile */}
+                          {/* Date block */}
                           <div className="shrink-0 text-center w-10 sm:w-14">
                             <p className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase">
                               {format(new Date(visitDate), "MMM")}
@@ -405,7 +417,7 @@ export default function SiteVisitsPage() {
                                 href={`/leads/${lead.id}`}
                                 className="group/lead flex items-center gap-2 mb-1"
                               >
-                                <div className="w-7 h-7 rounded-full bg-background border flex items-center justify-center shrink-0 hidden sm:flex">
+                                <div className="w-7 h-7 bg-background border flex items-center justify-center shrink-0 hidden sm:flex">
                                   <User className="w-3 h-3 text-muted-foreground" />
                                 </div>
                                 <div className="min-w-0">

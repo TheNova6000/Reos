@@ -64,6 +64,14 @@ import {
   deleteProperties,
   updatePropertiesStatus,
 } from "@/lib/demo-store";
+import { AnimatedCounter } from "@/components/dashboard/animated-counter";
+
+function formatLakh(v: number): string {
+  if (v >= 10000000) return `${(v / 10000000).toFixed(1)}Cr`;
+  if (v >= 100000) return `${(v / 100000).toFixed(1)}L`;
+  if (v >= 1000) return `${(v / 1000).toFixed(0)}K`;
+  return String(Math.round(v));
+}
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import { CSVImportDialog } from "@/components/dashboard/csv-import-dialog";
 import { PropertiesMapDynamic } from "@/components/dashboard/properties-map-dynamic";
@@ -300,23 +308,28 @@ export default function InventoryPage() {
       />
       <div className="p-4 space-y-4">
         {/* Summary Strip */}
-        <div className="flex gap-3 flex-wrap">
-          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
-            <Building2 className="w-4 h-4 text-primary" />
-            <div><p className="text-xs text-muted-foreground">Projects</p><p className="text-sm font-semibold">{store.projects.length}</p></div>
-          </div>
-          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
-            <Home className="w-4 h-4 text-violet-500" />
-            <div><p className="text-xs text-muted-foreground">Properties</p><p className="text-sm font-semibold">{store.properties.length}</p></div>
-          </div>
-          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
-            <CheckCircle className="w-4 h-4 text-emerald-500" />
-            <div><p className="text-xs text-muted-foreground">Available</p><p className="text-sm font-semibold">{availableCount}</p></div>
-          </div>
-          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
-            <IndianRupee className="w-4 h-4 text-amber-500" />
-            <div><p className="text-xs text-muted-foreground">Total Value</p><p className="text-sm font-semibold">{formatCurrency(totalValue)}</p></div>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Projects", value: store.projects.length, icon: Building2, accent: "text-primary", border: "border-primary/20", bg: "bg-primary/5", formatter: undefined as undefined | ((v: number) => string) },
+            { label: "Properties", value: store.properties.length, icon: Home, accent: "text-blue-600 dark:text-blue-400", border: "border-blue-500/20", bg: "bg-blue-500/5", formatter: undefined },
+            { label: "Available", value: availableCount, icon: CheckCircle, accent: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/20", bg: "bg-emerald-500/5", formatter: undefined },
+            { label: "Total Value", value: totalValue, icon: IndianRupee, accent: "text-amber-600 dark:text-amber-400", border: "border-amber-500/20", bg: "bg-amber-500/5", formatter: formatLakh },
+          ].map((stat, i) => (
+            <div
+              key={stat.label}
+              className={`border ${stat.border} ${stat.bg} px-3 py-2.5 animate-fade-up`}
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+                <stat.icon className={`w-3.5 h-3.5 ${stat.accent}`} />
+              </div>
+              <p className={`text-xl font-bold tabular-nums ${stat.accent}`}>
+                {stat.label === "Total Value" && "₹"}
+                <AnimatedCounter value={stat.value} formatter={stat.formatter} startDelay={i * 60} />
+              </p>
+            </div>
+          ))}
         </div>
 
         {/* Search & Filters */}

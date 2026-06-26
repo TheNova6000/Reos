@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +9,45 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Check, Users } from "lucide-react";
+import {
+  Check, Users, Building2, MessageSquare, MapPin, Database, ExternalLink,
+  Home, IndianRupee,
+} from "lucide-react";
 import { useDemoStore, updateSettings } from "@/lib/demo-store";
 import { demoUsers } from "@/lib/demo-data";
+
+const ROLE_STYLES: Record<string, string> = {
+  admin: "bg-primary/10 text-primary border-primary/30",
+  agent: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+  manager: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+};
+
+const INTEGRATION_ITEMS = [
+  {
+    name: "WhatsApp Business API",
+    description: "Connect WhatsApp for customer communication",
+    icon: MessageSquare,
+    status: "available" as const,
+  },
+  {
+    name: "Google Maps API",
+    description: "Property location and map features",
+    icon: MapPin,
+    status: "available" as const,
+  },
+  {
+    name: "Supabase",
+    description: "Database, auth, and file storage",
+    icon: Database,
+    status: "connected" as const,
+  },
+  {
+    name: "99acres / MagicBricks",
+    description: "Import leads from listing portals",
+    icon: ExternalLink,
+    status: "coming_soon" as const,
+  },
+];
 
 export default function SettingsPage() {
   const store = useDemoStore();
@@ -41,17 +77,30 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  const systemStats = [
+    { label: "Projects", value: store.projects.length, icon: Building2, accent: "text-primary" },
+    { label: "Properties", value: store.properties.length, icon: Home, accent: "text-blue-600 dark:text-blue-400" },
+    { label: "Leads", value: store.leads.length, icon: Users, accent: "text-rose-600 dark:text-rose-400" },
+    { label: "TDS Rate", value: `${store.settings.tds_percentage}%`, icon: IndianRupee, accent: "text-amber-600 dark:text-amber-400" },
+    { label: "Currency", value: `${store.settings.currency_symbol} (INR)`, icon: IndianRupee, accent: "text-emerald-600 dark:text-emerald-400" },
+    { label: "Company", value: store.settings.company_name, icon: Building2, accent: "text-foreground" },
+  ];
+
   return (
     <>
       <DashboardHeader title="Settings" description="System configuration" />
       <div className="p-4">
         <Tabs defaultValue="company">
-          <TabsList>
+          <TabsList variant="line">
             <TabsTrigger value="company">Company</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="users">
+              <Users className="w-4 h-4" />
+              Team ({demoUsers.length})
+            </TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
           </TabsList>
 
+          {/* Company Tab */}
           <TabsContent value="company" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
@@ -106,7 +155,9 @@ export default function SettingsPage() {
                     placeholder="Full office address"
                   />
                 </div>
+
                 <Separator />
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="tds_percentage">TDS Percentage (%)</Label>
@@ -118,21 +169,26 @@ export default function SettingsPage() {
                       step="0.01"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Applied to property transactions above ₹50 lakhs (Section 194-IA)
+                      Applied to transactions above ₹50 lakhs (Section 194-IA)
                     </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="primary_color">Brand Color</Label>
-                    <Input
-                      id="primary_color"
-                      type="color"
-                      value={primaryColor}
-                      onChange={(e) => setPrimaryColor(e.target.value)}
-                      className="h-9"
-                    />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="primary_color"
+                        type="color"
+                        value={primaryColor}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        className="h-9 w-16 p-1 cursor-pointer"
+                      />
+                      <span className="text-sm text-muted-foreground font-mono">{primaryColor}</span>
+                    </div>
                   </div>
                 </div>
+
                 <Separator />
+
                 <div className="space-y-2">
                   <Label htmlFor="auto_assign">Auto-assign New Leads</Label>
                   <div className="flex items-center gap-3">
@@ -146,18 +202,23 @@ export default function SettingsPage() {
                         autoAssign ? "bg-primary" : "bg-muted"
                       }`}
                     >
-                      <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform ${
-                        autoAssign ? "translate-x-5" : "translate-x-0.5"
-                      } mt-0.5`} />
+                      <span
+                        className={`inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform mt-0.5 ${
+                          autoAssign ? "translate-x-5" : "translate-x-0.5"
+                        }`}
+                      />
                     </button>
                     <span className="text-sm text-muted-foreground">
-                      {autoAssign ? "New leads auto-assigned to agent with fewest active leads" : "Disabled — leads must be assigned manually"}
+                      {autoAssign
+                        ? "Auto-assigned to agent with fewest active leads"
+                        : "Disabled — assign manually"}
                     </span>
                   </div>
                 </div>
-                <div className="flex justify-end gap-2">
+
+                <div className="flex justify-end items-center gap-3">
                   {saved && (
-                    <span className="flex items-center gap-1 text-sm text-emerald-600">
+                    <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 font-medium animate-fade-up">
                       <Check className="w-4 h-4" /> Saved
                     </span>
                   )}
@@ -166,66 +227,63 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
+            {/* System Stats */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Current Configuration</CardTitle>
+                <CardTitle className="text-base">System Overview</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground">Company</p>
-                    <p className="font-medium">{store.settings.company_name}</p>
-                  </div>
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground">TDS Rate</p>
-                    <p className="font-medium">{store.settings.tds_percentage}%</p>
-                  </div>
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground">Currency</p>
-                    <p className="font-medium">{store.settings.currency_symbol} (INR)</p>
-                  </div>
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground">Projects</p>
-                    <p className="font-medium">{store.projects.length}</p>
-                  </div>
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground">Properties</p>
-                    <p className="font-medium">{store.properties.length}</p>
-                  </div>
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground">Leads</p>
-                    <p className="font-medium">{store.leads.length}</p>
-                  </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {systemStats.map((stat) => (
+                    <div key={stat.label} className="border border-border/50 bg-muted/30 px-3 py-2.5">
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">
+                        {stat.label}
+                      </p>
+                      <p className={`text-sm font-bold truncate ${stat.accent}`}>{stat.value}</p>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* Users Tab */}
           <TabsContent value="users" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Team Members</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {demoUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-3 rounded-lg border"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Users className="w-4 h-4 text-primary" />
+              <CardContent className="space-y-2">
+                {demoUsers.map((user) => {
+                  const initials = user.full_name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase();
+                  return (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-3 border border-border/50 hover:border-border transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-bold text-primary">{initials}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{user.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{user.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
-                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs capitalize ${ROLE_STYLES[user.role] || ""}`}
+                      >
+                        {user.role}
+                      </Badge>
                     </div>
-                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                      {user.role}
-                    </Badge>
-                  </div>
-                ))}
+                  );
+                })}
                 <p className="text-xs text-muted-foreground pt-2">
                   User management will be available once Supabase Auth is connected.
                 </p>
@@ -233,40 +291,42 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
+          {/* Integrations Tab */}
           <TabsContent value="integrations" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Integrations</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">WhatsApp Business API</p>
-                    <p className="text-xs text-muted-foreground">Connect WhatsApp for customer communication</p>
+              <CardContent className="space-y-3">
+                {INTEGRATION_ITEMS.map((item) => (
+                  <div
+                    key={item.name}
+                    className="flex items-center justify-between p-3 border border-border/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-muted flex items-center justify-center shrink-0">
+                        <item.icon className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                      </div>
+                    </div>
+                    {item.status === "connected" ? (
+                      <Badge variant="outline" className="text-emerald-600 border-emerald-500 dark:text-emerald-400 gap-1 text-xs">
+                        <Check className="w-3 h-3" /> Connected
+                      </Badge>
+                    ) : item.status === "coming_soon" ? (
+                      <Button variant="outline" size="sm" disabled className="text-xs">
+                        Coming Soon
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="text-xs">
+                        Configure
+                      </Button>
+                    )}
                   </div>
-                  <Button variant="outline" size="sm">Configure</Button>
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">Google Maps API</p>
-                    <p className="text-xs text-muted-foreground">Property location and map features</p>
-                  </div>
-                  <Button variant="outline" size="sm">Configure</Button>
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">Supabase</p>
-                    <p className="text-xs text-muted-foreground">Database, auth, and file storage</p>
-                  </div>
-                  <Badge variant="outline">Placeholder</Badge>
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">99acres / MagicBricks</p>
-                    <p className="text-xs text-muted-foreground">Import leads from listing portals</p>
-                  </div>
-                  <Button variant="outline" size="sm" disabled>Coming Soon</Button>
-                </div>
+                ))}
               </CardContent>
             </Card>
           </TabsContent>
