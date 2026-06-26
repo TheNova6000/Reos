@@ -109,9 +109,9 @@ export function AppSidebar() {
         )}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link href="/" />}>
+            <SidebarMenuButton render={<a href="https://vision-infra-tech-thlq.vercel.app" target="_blank" rel="noopener noreferrer" />}>
               <ExternalLink className="w-4 h-4" />
-              <span>REOS Website</span>
+              <span>View Website</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
