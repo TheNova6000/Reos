@@ -1,0 +1,17 @@
+{
+  "name": "REOS - Real Estate Operating System",
+  "short_name": "REOS",
+  "description": "Complete real estate management platform — inventory, CRM, documents, analytics, and compliance in one system.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#1e40af",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}
