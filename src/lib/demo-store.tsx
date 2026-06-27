@@ -227,6 +227,7 @@ export function initializeStore(): Promise<void> {
       }
       store._loaded = true;
       emitChange();
+      initializeRealtime();
       console.log("[REOS] Store loaded from Supabase", store.tenantId ? `(tenant: ${store.tenantId})` : "");
     } catch (err) {
       console.warn("[REOS] Supabase load failed, falling back to localStorage + demo data:", err);
@@ -244,6 +245,103 @@ if (typeof window !== "undefined") {
   initializeStore();
 }
 
+// ── Realtime subscriptions ────────────────────────────────
+type TableName = "projects" | "properties" | "leads" | "activities" | "documents" | "bookings" | "payments" | "settings" | "payment_schedules";
+
+const REALTIME_TABLES: TableName[] = [
+  "projects", "properties", "leads", "activities",
+  "documents", "bookings", "payments", "payment_schedules",
+];
+
+let realtimeInitialized = false;
+const pendingLocalIds = new Set<string>();
+
+function getStoreArray(table: TableName): { id: string }[] {
+  const map: Record<TableName, { id: string }[]> = {
+    projects: store.projects,
+    properties: store.properties,
+    leads: store.leads,
+    activities: store.activities,
+    documents: store.documents,
+    bookings: store.bookings,
+    payments: store.payments,
+    payment_schedules: store.paymentSchedules,
+    settings: [],
+  };
+  return map[table] || [];
+}
+
+function setStoreArray(table: TableName, arr: unknown[]) {
+  const setters: Record<TableName, () => void> = {
+    projects: () => { store.projects = arr as Project[]; },
+    properties: () => { store.properties = arr as Property[]; },
+    leads: () => { store.leads = arr as Lead[]; },
+    activities: () => { store.activities = arr as Activity[]; },
+    documents: () => { store.documents = arr as Document[]; },
+    bookings: () => { store.bookings = arr as Booking[]; },
+    payments: () => { store.payments = arr as Payment[]; },
+    payment_schedules: () => { store.paymentSchedules = arr as PaymentSchedule[]; },
+    settings: () => {},
+  };
+  setters[table]?.();
+}
+
+export function initializeRealtime() {
+  const client = sb();
+  if (!client || realtimeInitialized || useLocalFallback) return;
+  realtimeInitialized = true;
+
+  for (const table of REALTIME_TABLES) {
+    client
+      .channel(`realtime-${table}`)
+      .on(
+        "postgres_changes" as "system",
+        { event: "*", schema: "public", table } as Record<string, unknown>,
+        (payload: { eventType: string; new: Record<string, unknown>; old: { id?: string } }) => {
+          const newRow = payload.new as { id: string } & Record<string, unknown>;
+          const oldRow = payload.old;
+
+          if (newRow?.id && pendingLocalIds.has(newRow.id)) {
+            pendingLocalIds.delete(newRow.id);
+            return;
+          }
+
+          if (payload.eventType === "INSERT") {
+            const arr = getStoreArray(table);
+            if (!arr.find((r) => r.id === newRow.id)) {
+              setStoreArray(table, [newRow, ...arr]);
+              emitChange();
+              console.log(`[REOS Realtime] ${table} INSERT`, newRow.id);
+            }
+          } else if (payload.eventType === "UPDATE") {
+            const arr = getStoreArray(table);
+            const idx = arr.findIndex((r) => r.id === newRow.id);
+            if (idx >= 0) {
+              const updated = [...arr];
+              updated[idx] = newRow as typeof arr[0];
+              setStoreArray(table, updated);
+              emitChange();
+              console.log(`[REOS Realtime] ${table} UPDATE`, newRow.id);
+            }
+          } else if (payload.eventType === "DELETE" && oldRow?.id) {
+            const arr = getStoreArray(table);
+            setStoreArray(table, arr.filter((r) => r.id !== oldRow.id));
+            emitChange();
+            console.log(`[REOS Realtime] ${table} DELETE`, oldRow.id);
+          }
+
+          if (table === "settings" && payload.eventType !== "DELETE" && newRow) {
+            store.settings = newRow as unknown as Settings;
+            emitChange();
+          }
+        }
+      )
+      .subscribe();
+  }
+
+  console.log("[REOS] Realtime subscriptions active on", REALTIME_TABLES.length, "tables");
+}
+
 // ── Persist helper ─────────────────────────────────────────
 async function persist(
   table: string,
@@ -256,12 +354,18 @@ async function persist(
   if (op === "insert" && store.tenantId && !data.tenant_id) {
     data = { ...data, tenant_id: store.tenantId };
   }
+
+  // Mark IDs so Realtime skips events we caused
+  if (match?.id) pendingLocalIds.add(match.id);
+
   try {
     if (op === "insert") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: rows, error } = await client.from(table).insert(data as any).select();
       if (error) throw error;
-      return rows?.[0] ?? null;
+      const row = rows?.[0] ?? null;
+      if (row?.id) pendingLocalIds.add(row.id);
+      return row;
     }
     if (op === "update" && match) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
