@@ -25,16 +25,26 @@ import {
 } from "@/components/ui/dialog";
 import {
   Check, Users, Building2, MessageSquare, MapPin, Database, ExternalLink,
-  Home, IndianRupee, UserPlus, Mail,
+  Home, IndianRupee, UserPlus, Mail, Shield, Trash2, ChevronDown, X,
 } from "lucide-react";
 import { useDemoStore, updateSettings } from "@/lib/demo-store";
 import { demoUsers } from "@/lib/demo-data";
-import { inviteTeamMember, type InviteState } from "@/app/actions/auth";
+import {
+  inviteTeamMember, updateMemberRole, removeMember,
+  type InviteState,
+} from "@/app/actions/auth";
+import {
+  ROLES, PERMISSION_GROUPS, PERMISSION_LABELS,
+  getRoleByName, hasPermission,
+  type RoleName, type Permission,
+} from "@/lib/constants";
 
 const ROLE_STYLES: Record<string, string> = {
+  owner: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
   admin: "bg-primary/10 text-primary border-primary/30",
-  agent: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
   manager: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+  agent: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+  viewer: "bg-gray-500/10 text-gray-500 dark:text-gray-400 border-gray-500/30",
 };
 
 const INTEGRATION_ITEMS = [
@@ -264,63 +274,50 @@ export default function SettingsPage() {
 
           {/* Users Tab */}
           <TabsContent value="users" className="mt-4 space-y-4">
+            {/* Team Members */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Team Members</CardTitle>
                 <InviteDialog tenantId={store.tenantId} />
               </CardHeader>
               <CardContent className="space-y-2">
-                {/* Show current user first if logged in */}
                 {store.currentUser && (
-                  <div className="flex items-center justify-between p-3 border-2 border-primary/20 bg-primary/5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="text-xs font-bold text-primary">
-                          {store.currentUser.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold">{store.currentUser.full_name} <span className="text-xs text-muted-foreground font-normal">(you)</span></p>
-                        <p className="text-xs text-muted-foreground">{store.currentUser.email}</p>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className={`text-xs capitalize ${ROLE_STYLES[store.currentUser.role] || ""}`}>
-                      {store.currentUser.role}
-                    </Badge>
-                  </div>
+                  <TeamMemberRow
+                    user={store.currentUser}
+                    isSelf
+                    canManage={false}
+                    tenantId={store.tenantId}
+                  />
                 )}
                 {demoUsers
                   .filter((u) => !store.currentUser || u.id !== store.currentUser.id)
-                  .map((user) => {
-                    const initials = user.full_name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase();
-                    return (
-                      <div
-                        key={user.id}
-                        className="flex items-center justify-between p-3 border border-border/50 hover:border-border transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-xs font-bold text-primary">{initials}</span>
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold">{user.full_name}</p>
-                            <p className="text-xs text-muted-foreground">{user.email}</p>
-                          </div>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={`text-xs capitalize ${ROLE_STYLES[user.role] || ""}`}
-                        >
-                          {user.role}
-                        </Badge>
-                      </div>
-                    );
-                  })}
+                  .map((user) => (
+                    <TeamMemberRow
+                      key={user.id}
+                      user={user}
+                      isSelf={false}
+                      canManage={hasPermission(store.currentUser?.role || "viewer", "team.change_role")}
+                      canRemove={hasPermission(store.currentUser?.role || "viewer", "team.remove")}
+                      tenantId={store.tenantId}
+                    />
+                  ))}
+              </CardContent>
+            </Card>
+
+            {/* Roles & Permissions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  Roles & Permissions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {ROLES.map((role) => (
+                    <RolePermissionCard key={role.name} role={role} />
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -369,6 +366,176 @@ export default function SettingsPage() {
     </>
   );
 }
+
+// ── Team Member Row ────────────────────────────────────────
+
+function TeamMemberRow({ user, isSelf, canManage, canRemove, tenantId }: {
+  user: { id: string; full_name: string; email: string; role: string; phone?: string | null };
+  isSelf?: boolean;
+  canManage?: boolean;
+  canRemove?: boolean;
+  tenantId: string | null;
+}) {
+  const [changingRole, setChangingRole] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const initials = user.full_name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const roleDef = getRoleByName(user.role);
+  const isProtected = roleDef?.isProtected;
+
+  async function handleRoleChange(newRole: string) {
+    if (!tenantId || newRole === user.role) return;
+    setChangingRole(true);
+    setError(null);
+    const result = await updateMemberRole(user.id, newRole, tenantId);
+    setChangingRole(false);
+    if (result.error) setError(result.error);
+  }
+
+  async function handleRemove() {
+    if (!tenantId) return;
+    if (!confirm(`Remove ${user.full_name} from the team? This will delete their account.`)) return;
+    setRemoving(true);
+    setError(null);
+    const result = await removeMember(user.id, tenantId);
+    setRemoving(false);
+    if (result.error) setError(result.error);
+  }
+
+  return (
+    <div className={`p-3 border transition-colors ${isSelf ? "border-2 border-primary/20 bg-primary/5" : "border-border/50 hover:border-border"}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-primary/10 flex items-center justify-center shrink-0">
+            <span className="text-xs font-bold text-primary">{initials}</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold">
+              {user.full_name}
+              {isSelf && <span className="text-xs text-muted-foreground font-normal ml-1">(you)</span>}
+            </p>
+            <p className="text-xs text-muted-foreground">{user.email}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {canManage && !isSelf && !isProtected ? (
+            <Select
+              value={user.role}
+              onValueChange={(v) => v && handleRoleChange(v)}
+            >
+              <SelectTrigger className="h-7 w-[130px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map((r) => (
+                  <SelectItem key={r.name} value={r.name}>
+                    <span className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${ROLE_STYLES[r.name]?.split(" ")[0] || "bg-gray-300"}`} />
+                      {r.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Badge variant="outline" className={`text-xs capitalize ${ROLE_STYLES[user.role] || ""}`}>
+              {roleDef?.label || user.role}
+            </Badge>
+          )}
+          {canRemove && !isSelf && !isProtected && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive hover:text-destructive"
+              onClick={handleRemove}
+              disabled={removing}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </div>
+      </div>
+      {error && (
+        <p className="text-xs text-destructive mt-2 ml-12">{error}</p>
+      )}
+      {/* Permission summary */}
+      {roleDef && (
+        <p className="text-[11px] text-muted-foreground mt-1.5 ml-12">{roleDef.description}</p>
+      )}
+    </div>
+  );
+}
+
+// ── Role Permission Card ──────────────────────────────────
+
+function RolePermissionCard({ role }: { role: ReturnType<typeof getRoleByName> & {} }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="border border-border/50">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className={`text-xs capitalize ${ROLE_STYLES[role.name] || ""}`}>
+            {role.label}
+          </Badge>
+          <span className="text-sm text-muted-foreground">{role.description}</span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3 space-y-3">
+          <Separator />
+          {PERMISSION_GROUPS.map((group) => {
+            const groupPerms = group.permissions;
+            const hasAny = groupPerms.some((p) => role.permissions.includes(p));
+            if (!hasAny && role.name === "viewer") {
+              const hasRead = groupPerms.some((p) => role.permissions.includes(p));
+              if (!hasRead) return null;
+            }
+            return (
+              <div key={group.label}>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                  {group.label}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {groupPerms.map((perm) => {
+                    const has = role.permissions.includes(perm);
+                    return (
+                      <span
+                        key={perm}
+                        className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 border ${
+                          has
+                            ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                            : "bg-muted/30 text-muted-foreground/50 border-border/30 line-through"
+                        }`}
+                      >
+                        {has ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                        {PERMISSION_LABELS[perm]}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Invite Dialog ─────────────────────────────────────────
 
 function InviteDialog({ tenantId }: { tenantId: string | null }) {
   const [open, setOpen] = useState(false);
@@ -420,9 +587,14 @@ function InviteDialog({ tenantId }: { tenantId: string | null }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin — Full access</SelectItem>
-                  <SelectItem value="agent">Agent — Manage leads & properties</SelectItem>
-                  <SelectItem value="viewer">Viewer — Read-only access</SelectItem>
+                  {ROLES.filter((r) => !r.isProtected).map((r) => (
+                    <SelectItem key={r.name} value={r.name}>
+                      <div>
+                        <span className="font-medium">{r.label}</span>
+                        <span className="text-muted-foreground ml-1">— {r.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

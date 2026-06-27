@@ -193,3 +193,51 @@ export async function inviteTeamMember(
 
   return { success: true };
 }
+
+export async function updateMemberRole(
+  userId: string,
+  newRole: string,
+  tenantId: string
+): Promise<{ error?: string }> {
+  const admin = createAdminClient();
+  if (!admin) return { error: "Server configuration error." };
+
+  const { error } = await admin
+    .from("user_profiles")
+    .update({ role: newRole, updated_at: new Date().toISOString() })
+    .eq("id", userId)
+    .eq("tenant_id", tenantId);
+
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function removeMember(
+  userId: string,
+  tenantId: string
+): Promise<{ error?: string }> {
+  const admin = createAdminClient();
+  if (!admin) return { error: "Server configuration error." };
+
+  const { data: profile } = await admin
+    .from("user_profiles")
+    .select("role")
+    .eq("id", userId)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!profile) return { error: "Member not found." };
+  if (profile.role === "owner") return { error: "Cannot remove the owner." };
+
+  const { error: profileError } = await admin
+    .from("user_profiles")
+    .delete()
+    .eq("id", userId)
+    .eq("tenant_id", tenantId);
+
+  if (profileError) return { error: profileError.message };
+
+  await admin.auth.admin.deleteUser(userId);
+
+  return {};
+}

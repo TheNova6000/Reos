@@ -451,3 +451,158 @@ export function formatArea(area: number, unit: string): string {
   };
   return `${area.toLocaleString("en-IN")} ${unitLabels[unit] || unit}`;
 }
+
+// ── Roles & Permissions ───────────────────────────────────
+
+export type Permission =
+  | "projects.create"
+  | "projects.edit"
+  | "projects.delete"
+  | "properties.create"
+  | "properties.edit"
+  | "properties.delete"
+  | "properties.change_status"
+  | "leads.view"
+  | "leads.create"
+  | "leads.edit"
+  | "leads.delete"
+  | "leads.assign"
+  | "bookings.create"
+  | "bookings.edit"
+  | "bookings.cancel"
+  | "payments.add"
+  | "payments.view"
+  | "documents.upload"
+  | "documents.delete"
+  | "documents.download"
+  | "analytics.view"
+  | "compliance.view"
+  | "compliance.edit"
+  | "settings.view"
+  | "settings.edit"
+  | "team.view"
+  | "team.invite"
+  | "team.remove"
+  | "team.change_role";
+
+export type RoleName = "owner" | "admin" | "manager" | "agent" | "viewer";
+
+export interface RoleDefinition {
+  name: RoleName;
+  label: string;
+  description: string;
+  permissions: Permission[];
+  isDefault?: boolean;
+  isProtected?: boolean;
+}
+
+export const PERMISSION_LABELS: Record<Permission, string> = {
+  "projects.create": "Create projects",
+  "projects.edit": "Edit projects",
+  "projects.delete": "Delete projects",
+  "properties.create": "Add properties",
+  "properties.edit": "Edit properties",
+  "properties.delete": "Delete properties",
+  "properties.change_status": "Change property status",
+  "leads.view": "View leads",
+  "leads.create": "Create leads",
+  "leads.edit": "Edit leads",
+  "leads.delete": "Delete leads",
+  "leads.assign": "Assign leads to agents",
+  "bookings.create": "Create bookings",
+  "bookings.edit": "Edit bookings",
+  "bookings.cancel": "Cancel bookings",
+  "payments.add": "Record payments",
+  "payments.view": "View payments",
+  "documents.upload": "Upload documents",
+  "documents.delete": "Delete documents",
+  "documents.download": "Download documents",
+  "analytics.view": "View analytics",
+  "compliance.view": "View RERA compliance",
+  "compliance.edit": "Edit compliance data",
+  "settings.view": "View settings",
+  "settings.edit": "Edit company settings",
+  "team.view": "View team members",
+  "team.invite": "Invite team members",
+  "team.remove": "Remove team members",
+  "team.change_role": "Change member roles",
+};
+
+export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
+  { label: "Projects & Properties", permissions: ["projects.create", "projects.edit", "projects.delete", "properties.create", "properties.edit", "properties.delete", "properties.change_status"] },
+  { label: "Leads & CRM", permissions: ["leads.view", "leads.create", "leads.edit", "leads.delete", "leads.assign"] },
+  { label: "Bookings & Payments", permissions: ["bookings.create", "bookings.edit", "bookings.cancel", "payments.add", "payments.view"] },
+  { label: "Documents", permissions: ["documents.upload", "documents.delete", "documents.download"] },
+  { label: "Analytics & Compliance", permissions: ["analytics.view", "compliance.view", "compliance.edit"] },
+  { label: "Administration", permissions: ["settings.view", "settings.edit", "team.view", "team.invite", "team.remove", "team.change_role"] },
+];
+
+const ALL_PERMISSIONS: Permission[] = Object.keys(PERMISSION_LABELS) as Permission[];
+
+export const ROLES: RoleDefinition[] = [
+  {
+    name: "owner",
+    label: "Owner",
+    description: "Full access to everything. Cannot be removed.",
+    permissions: ALL_PERMISSIONS,
+    isProtected: true,
+  },
+  {
+    name: "admin",
+    label: "Admin",
+    description: "Full access except removing the owner.",
+    permissions: ALL_PERMISSIONS.filter((p) => p !== "team.remove"),
+  },
+  {
+    name: "manager",
+    label: "Manager",
+    description: "Manages projects, leads, bookings, and team. No settings or compliance editing.",
+    permissions: [
+      "projects.create", "projects.edit",
+      "properties.create", "properties.edit", "properties.change_status",
+      "leads.view", "leads.create", "leads.edit", "leads.assign",
+      "bookings.create", "bookings.edit", "bookings.cancel",
+      "payments.add", "payments.view",
+      "documents.upload", "documents.download",
+      "analytics.view", "compliance.view",
+      "settings.view", "team.view", "team.invite",
+    ],
+  },
+  {
+    name: "agent",
+    label: "Agent",
+    description: "Manages assigned leads, logs activities, creates bookings. Cannot delete or manage team.",
+    permissions: [
+      "properties.change_status",
+      "leads.view", "leads.create", "leads.edit",
+      "bookings.create",
+      "payments.add", "payments.view",
+      "documents.upload", "documents.download",
+      "analytics.view",
+      "settings.view", "team.view",
+    ],
+    isDefault: true,
+  },
+  {
+    name: "viewer",
+    label: "Viewer",
+    description: "Read-only access to all data. Cannot create, edit, or delete anything.",
+    permissions: [
+      "leads.view",
+      "payments.view",
+      "documents.download",
+      "analytics.view", "compliance.view",
+      "settings.view", "team.view",
+    ],
+  },
+];
+
+export function getRoleByName(name: string): RoleDefinition | undefined {
+  return ROLES.find((r) => r.name === name);
+}
+
+export function hasPermission(role: string, permission: Permission): boolean {
+  const roleDef = getRoleByName(role);
+  if (!roleDef) return false;
+  return roleDef.permissions.includes(permission);
+}
