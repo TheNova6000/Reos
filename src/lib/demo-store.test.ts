@@ -27,6 +27,7 @@ import {
   deleteBooking,
   deleteDocument,
   addDocument,
+  completeSiteVisit,
   getStoreSnapshot,
   getStoreStats,
 } from "./demo-store";
@@ -668,6 +669,181 @@ describe("Store — Stats", () => {
     const after = getStoreSnapshot().documents.length;
     expect(after).toBe(before - 1);
     expect(getStoreSnapshot().documents.find((d) => d.id === doc.id)).toBeUndefined();
+  });
+
+  // ── Site Visit Completion ──────────────────────────────
+
+  it("completeSiteVisit marks activity as completed with feedback", () => {
+    const lead = addLead({ name: "Visit Lead", phone: "9000" });
+    const activity = addActivity({
+      lead_id: lead.id,
+      activity_type: "site_visit",
+      description: "Visit at Green Valley",
+      scheduled_for: new Date().toISOString(),
+      is_completed: false,
+    });
+
+    const result = completeSiteVisit(activity.id, {
+      plots_shown: ["P1", "P2"],
+      rating: 4,
+      feedback: "Customer loved the east-facing plots",
+      attendees: ["Customer", "Wife"],
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.is_completed).toBe(true);
+    expect(result!.site_visit_feedback).not.toBeNull();
+    expect(result!.site_visit_feedback!.rating).toBe(4);
+    expect(result!.site_visit_feedback!.plots_shown).toEqual(["P1", "P2"]);
+    expect(result!.site_visit_feedback!.feedback).toBe("Customer loved the east-facing plots");
+    expect(result!.site_visit_feedback!.attendees).toEqual(["Customer", "Wife"]);
+  });
+
+  it("completeSiteVisit auto-advances lead to negotiation when rating >= 3", () => {
+    const lead = addLead({ name: "Hot Lead", phone: "9001" });
+    updateLeadStatus(lead.id, "site_visit");
+    const activity = addActivity({
+      lead_id: lead.id,
+      activity_type: "site_visit",
+      description: "Visit",
+      is_completed: false,
+    });
+
+    completeSiteVisit(activity.id, {
+      plots_shown: [],
+      rating: 4,
+      feedback: "Very interested",
+      attendees: [],
+    });
+
+    const updated = getStoreSnapshot().leads.find((l) => l.id === lead.id);
+    expect(updated!.status).toBe("negotiation");
+  });
+
+  it("completeSiteVisit does NOT advance lead when rating < 3", () => {
+    const lead = addLead({ name: "Cold Lead", phone: "9002" });
+    updateLeadStatus(lead.id, "site_visit");
+    const activity = addActivity({
+      lead_id: lead.id,
+      activity_type: "site_visit",
+      description: "Visit",
+      is_completed: false,
+    });
+
+    completeSiteVisit(activity.id, {
+      plots_shown: [],
+      rating: 2,
+      feedback: "Not interested in this area",
+      attendees: [],
+    });
+
+    const updated = getStoreSnapshot().leads.find((l) => l.id === lead.id);
+    expect(updated!.status).toBe("site_visit");
+  });
+
+  it("completeSiteVisit sets next_action on lead", () => {
+    const lead = addLead({ name: "Follow Up Lead", phone: "9003" });
+    const activity = addActivity({
+      lead_id: lead.id,
+      activity_type: "site_visit",
+      description: "Visit",
+      is_completed: false,
+    });
+
+    completeSiteVisit(activity.id, {
+      plots_shown: [],
+      rating: 3,
+      feedback: "Needs cost sheet",
+      attendees: [],
+      next_action: "Send cost sheet by Thursday",
+    });
+
+    const updated = getStoreSnapshot().leads.find((l) => l.id === lead.id);
+    expect(updated!.next_action).toBe("Send cost sheet by Thursday");
+  });
+
+  it("completeSiteVisit returns null for non-site-visit activity", () => {
+    const lead = addLead({ name: "Call Lead", phone: "9004" });
+    const activity = addActivity({
+      lead_id: lead.id,
+      activity_type: "call",
+      description: "Phone call",
+    });
+
+    const result = completeSiteVisit(activity.id, {
+      plots_shown: [],
+      rating: 5,
+      feedback: "test",
+      attendees: [],
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("completeSiteVisit returns null for unknown activity id", () => {
+    const result = completeSiteVisit("nonexistent-id", {
+      plots_shown: [],
+      rating: 3,
+      feedback: "test",
+      attendees: [],
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("completeSiteVisit updates last_contacted_at on the lead", () => {
+    const lead = addLead({ name: "Contact Lead", phone: "9005" });
+    const before = getStoreSnapshot().leads.find((l) => l.id === lead.id)!.last_contacted_at;
+    const activity = addActivity({
+      lead_id: lead.id,
+      activity_type: "site_visit",
+      description: "Visit",
+      is_completed: false,
+    });
+
+    completeSiteVisit(activity.id, {
+      plots_shown: ["P1"],
+      rating: 3,
+      feedback: "Good visit",
+      attendees: ["Customer"],
+    });
+
+    const after = getStoreSnapshot().leads.find((l) => l.id === lead.id)!.last_contacted_at;
+    expect(after).not.toBe(before);
+  });
+
+  // ── Lead Pipeline Transitions ─────────────────────────
+
+  it("lead pipeline follows correct sequence: new → contacted → site_visit → negotiation → booked", () => {
+    const lead = addLead({ name: "Pipeline Lead", phone: "9010" });
+    expect(getStoreSnapshot().leads.find((l) => l.id === lead.id)!.status).toBe("new");
+
+    updateLeadStatus(lead.id, "contacted");
+    expect(getStoreSnapshot().leads.find((l) => l.id === lead.id)!.status).toBe("contacted");
+
+    updateLeadStatus(lead.id, "site_visit");
+    expect(getStoreSnapshot().leads.find((l) => l.id === lead.id)!.status).toBe("site_visit");
+
+    updateLeadStatus(lead.id, "negotiation");
+    expect(getStoreSnapshot().leads.find((l) => l.id === lead.id)!.status).toBe("negotiation");
+
+    updateLeadStatus(lead.id, "booked");
+    expect(getStoreSnapshot().leads.find((l) => l.id === lead.id)!.status).toBe("booked");
+  });
+
+  it("addActivity with site_visit type creates activity with is_completed false by default when specified", () => {
+    const lead = addLead({ name: "Sched Lead", phone: "9011" });
+    const activity = addActivity({
+      lead_id: lead.id,
+      activity_type: "site_visit",
+      description: "Scheduled visit",
+      scheduled_for: new Date(Date.now() + 86400000).toISOString(),
+      is_completed: false,
+    });
+
+    expect(activity.is_completed).toBe(false);
+    expect(activity.activity_type).toBe("site_visit");
+    expect(activity.scheduled_for).not.toBeNull();
   });
 
   it("sold count increases after registering a booking", () => {

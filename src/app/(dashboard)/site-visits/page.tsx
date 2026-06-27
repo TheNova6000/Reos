@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SiteVisitCalendar } from "@/components/dashboard/site-visit-calendar";
-import { useDemoStore, addActivity } from "@/lib/demo-store";
+import { useDemoStore, addActivity, completeSiteVisit } from "@/lib/demo-store";
 import {
   Plus,
   CalendarDays,
@@ -164,6 +164,149 @@ function ScheduleSiteVisitDialog() {
           </div>
           <Button type="submit" className="w-full" disabled={!leadId || !dateTime}>
             <CalendarDays className="w-4 h-4 mr-1" /> Schedule Visit
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CompleteVisitDialog({ activityId, projectId, properties }: {
+  activityId: string;
+  projectId: string;
+  properties: { id: string; plot_number: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [plotsShown, setPlotsShown] = useState<string[]>([]);
+  const [rating, setRating] = useState("3");
+  const [feedback, setFeedback] = useState("");
+  const [attendees, setAttendees] = useState("");
+  const [nextAction, setNextAction] = useState("");
+
+  const projectProperties = properties.filter((p) => !projectId || true);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    completeSiteVisit(activityId, {
+      plots_shown: plotsShown,
+      rating: parseInt(rating) || 3,
+      feedback: feedback.trim(),
+      attendees: attendees.split(",").map((a) => a.trim()).filter(Boolean),
+      next_action: nextAction.trim() || undefined,
+    });
+    setOpen(false);
+  }
+
+  function togglePlot(id: string) {
+    setPlotsShown((prev) => prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]);
+  }
+
+  const ratingLabels: Record<string, { label: string; color: string }> = {
+    "1": { label: "Not Interested", color: "text-rose-500" },
+    "2": { label: "Lukewarm", color: "text-amber-500" },
+    "3": { label: "Interested", color: "text-blue-500" },
+    "4": { label: "Very Interested", color: "text-emerald-500" },
+    "5": { label: "Ready to Book", color: "text-emerald-600 font-bold" },
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={
+        <Button size="sm" variant="outline" className="text-xs gap-1">
+          <Check className="w-3 h-3" /> Complete
+        </Button>
+      } />
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Check className="w-5 h-5 text-emerald-500" />
+            Complete Site Visit
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Customer Reaction */}
+          <div className="space-y-2">
+            <Label>Customer Reaction *</Label>
+            <Select value={rating} onValueChange={(v) => v && setRating(v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(ratingLabels).map(([val, { label, color }]) => (
+                  <SelectItem key={val} value={val}>
+                    <span className={color}>{val}/5 — {label}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Rating 3+ auto-advances the lead to Negotiation stage
+            </p>
+          </div>
+
+          {/* Plots Shown */}
+          {projectProperties.length > 0 && (
+            <div className="space-y-2">
+              <Label>Plots/Properties Shown</Label>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                {projectProperties.slice(0, 20).map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => togglePlot(p.id)}
+                    className={`px-2 py-1 text-xs border transition-colors ${
+                      plotsShown.includes(p.id)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-foreground/30"
+                    }`}
+                  >
+                    {p.plot_number}
+                  </button>
+                ))}
+              </div>
+              {plotsShown.length > 0 && (
+                <p className="text-xs text-muted-foreground">{plotsShown.length} selected</p>
+              )}
+            </div>
+          )}
+
+          {/* Feedback Notes */}
+          <div className="space-y-2">
+            <Label htmlFor="cv-feedback">Visit Notes *</Label>
+            <Textarea
+              id="cv-feedback"
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="What did the customer like? Any concerns? Budget discussion? Family members present?"
+              rows={3}
+              required
+            />
+          </div>
+
+          {/* Attendees */}
+          <div className="space-y-2">
+            <Label htmlFor="cv-attendees">Who Attended</Label>
+            <Input
+              id="cv-attendees"
+              value={attendees}
+              onChange={(e) => setAttendees(e.target.value)}
+              placeholder="Customer, wife, father (comma separated)"
+            />
+          </div>
+
+          {/* Next Action */}
+          <div className="space-y-2">
+            <Label htmlFor="cv-next">Next Action</Label>
+            <Input
+              id="cv-next"
+              value={nextAction}
+              onChange={(e) => setNextAction(e.target.value)}
+              placeholder="e.g., Send cost sheet, Schedule 2nd visit, Share layout"
+            />
+          </div>
+
+          <Button type="submit" className="w-full" disabled={!feedback.trim()}>
+            <Check className="w-4 h-4 mr-1" /> Mark as Completed
           </Button>
         </form>
       </DialogContent>
@@ -449,6 +592,31 @@ export default function SiteVisitsPage() {
                                 </span>
                               )}
                             </div>
+
+                            {/* Complete button for upcoming/missed */}
+                            {status !== "completed" && (
+                              <div className="mt-2 sm:pl-9">
+                                <CompleteVisitDialog
+                                  activityId={visit.id}
+                                  projectId={visit.site_visit_feedback?.project_id || ""}
+                                  properties={store.properties.filter((p) =>
+                                    !visit.site_visit_feedback?.project_id || p.project_id === visit.site_visit_feedback.project_id
+                                  )}
+                                />
+                              </div>
+                            )}
+
+                            {/* Show feedback for completed visits */}
+                            {status === "completed" && visit.site_visit_feedback?.feedback && (
+                              <div className="mt-2 sm:pl-9 p-2 bg-emerald-500/5 border border-emerald-500/10 text-xs">
+                                <p className="text-emerald-600 dark:text-emerald-400 font-medium mb-0.5">
+                                  Rating: {visit.site_visit_feedback.rating}/5
+                                  {visit.site_visit_feedback.plots_shown.length > 0 && ` · ${visit.site_visit_feedback.plots_shown.length} plots shown`}
+                                  {visit.site_visit_feedback.attendees.length > 0 && ` · ${visit.site_visit_feedback.attendees.length} attendees`}
+                                </p>
+                                <p className="text-muted-foreground">{visit.site_visit_feedback.feedback}</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

@@ -725,6 +725,60 @@ export function addActivity(data: {
   return newActivity;
 }
 
+export function completeSiteVisit(
+  activityId: string,
+  feedback: {
+    plots_shown: string[];
+    rating: number;
+    feedback: string;
+    attendees: string[];
+    next_action?: string;
+  }
+): Activity | null {
+  const activity = store.activities.find((a) => a.id === activityId);
+  if (!activity || activity.activity_type !== "site_visit") return null;
+
+  const now = new Date().toISOString();
+  const updatedFeedback: SiteVisitFeedback = {
+    project_id: activity.site_visit_feedback?.project_id || "",
+    plots_shown: feedback.plots_shown,
+    rating: feedback.rating,
+    feedback: feedback.feedback,
+    attendees: feedback.attendees,
+  };
+
+  store.activities = store.activities.map((a) =>
+    a.id === activityId
+      ? { ...a, is_completed: true, site_visit_feedback: updatedFeedback, description: `${a.description} — Completed: ${feedback.feedback}` }
+      : a
+  );
+
+  // Auto-update lead: set last_contacted_at and optionally advance pipeline
+  const lead = store.leads.find((l) => l.id === activity.lead_id);
+  if (lead) {
+    const updates: Partial<Lead> = { last_contacted_at: now, updated_at: now };
+    if (lead.status === "site_visit" && feedback.rating >= 3) {
+      updates.status = "negotiation";
+    }
+    if (feedback.next_action) {
+      updates.next_action = feedback.next_action;
+    }
+    store.leads = store.leads.map((l) =>
+      l.id === activity.lead_id ? { ...l, ...updates } : l
+    );
+    persist("leads", "update", updates, { id: activity.lead_id });
+  }
+
+  emitChange();
+  persist("activities", "update", {
+    is_completed: true,
+    site_visit_feedback: updatedFeedback,
+    description: store.activities.find((a) => a.id === activityId)?.description,
+  }, { id: activityId });
+
+  return store.activities.find((a) => a.id === activityId) || null;
+}
+
 export function updateLead(
   id: string,
   data: Partial<Omit<Lead, "id" | "created_at" | "assigned_agent" | "activities">>
