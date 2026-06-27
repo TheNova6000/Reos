@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useActionState } from "react";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,11 +10,26 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Check, Users, Building2, MessageSquare, MapPin, Database, ExternalLink,
-  Home, IndianRupee,
+  Home, IndianRupee, UserPlus, Mail,
 } from "lucide-react";
 import { useDemoStore, updateSettings } from "@/lib/demo-store";
 import { demoUsers } from "@/lib/demo-data";
+import { inviteTeamMember, type InviteState } from "@/app/actions/auth";
 
 const ROLE_STYLES: Record<string, string> = {
   admin: "bg-primary/10 text-primary border-primary/30",
@@ -248,45 +263,64 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* Users Tab */}
-          <TabsContent value="users" className="mt-4">
+          <TabsContent value="users" className="mt-4 space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Team Members</CardTitle>
+                <InviteDialog tenantId={store.tenantId} />
               </CardHeader>
               <CardContent className="space-y-2">
-                {demoUsers.map((user) => {
-                  const initials = user.full_name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase();
-                  return (
-                    <div
-                      key={user.id}
-                      className="flex items-center justify-between p-3 border border-border/50 hover:border-border transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-bold text-primary">{initials}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold">{user.full_name}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
-                        </div>
+                {/* Show current user first if logged in */}
+                {store.currentUser && (
+                  <div className="flex items-center justify-between p-3 border-2 border-primary/20 bg-primary/5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-primary">
+                          {store.currentUser.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </span>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs capitalize ${ROLE_STYLES[user.role] || ""}`}
-                      >
-                        {user.role}
-                      </Badge>
+                      <div>
+                        <p className="text-sm font-semibold">{store.currentUser.full_name} <span className="text-xs text-muted-foreground font-normal">(you)</span></p>
+                        <p className="text-xs text-muted-foreground">{store.currentUser.email}</p>
+                      </div>
                     </div>
-                  );
-                })}
-                <p className="text-xs text-muted-foreground pt-2">
-                  User management will be available once Supabase Auth is connected.
-                </p>
+                    <Badge variant="outline" className={`text-xs capitalize ${ROLE_STYLES[store.currentUser.role] || ""}`}>
+                      {store.currentUser.role}
+                    </Badge>
+                  </div>
+                )}
+                {demoUsers
+                  .filter((u) => !store.currentUser || u.id !== store.currentUser.id)
+                  .map((user) => {
+                    const initials = user.full_name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase();
+                    return (
+                      <div
+                        key={user.id}
+                        className="flex items-center justify-between p-3 border border-border/50 hover:border-border transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-primary">{initials}</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold">{user.full_name}</p>
+                            <p className="text-xs text-muted-foreground">{user.email}</p>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs capitalize ${ROLE_STYLES[user.role] || ""}`}
+                        >
+                          {user.role}
+                        </Badge>
+                      </div>
+                    );
+                  })}
               </CardContent>
             </Card>
           </TabsContent>
@@ -333,5 +367,79 @@ export default function SettingsPage() {
         </Tabs>
       </div>
     </>
+  );
+}
+
+function InviteDialog({ tenantId }: { tenantId: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [role, setRole] = useState("agent");
+  const initialState: InviteState = {};
+  const [state, formAction, pending] = useActionState(inviteTeamMember, initialState);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); }}>
+      <DialogTrigger render={<Button size="sm" />}>
+        <UserPlus className="w-4 h-4 mr-1" />
+        Invite Member
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Invite Team Member</DialogTitle>
+        </DialogHeader>
+        {state.success ? (
+          <div className="text-center space-y-3 py-4">
+            <div className="mx-auto w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center rounded-full">
+              <Mail className="w-5 h-5 text-emerald-600" />
+            </div>
+            <p className="text-sm font-medium">Invitation sent!</p>
+            <p className="text-xs text-muted-foreground">A password reset email has been sent so they can set their own password.</p>
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Done</Button>
+          </div>
+        ) : (
+          <form action={formAction} className="space-y-4">
+            <input type="hidden" name="tenant_id" value={tenantId || ""} />
+            <input type="hidden" name="role" value={role} />
+            <div className="space-y-2">
+              <Label>Full Name</Label>
+              <Input name="full_name" placeholder="Agent name" required />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input name="email" type="email" placeholder="agent@company.com" required />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input name="phone" type="tel" placeholder="+91 98765 43210" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={role} onValueChange={(v) => v && setRole(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin — Full access</SelectItem>
+                  <SelectItem value="agent">Agent — Manage leads & properties</SelectItem>
+                  <SelectItem value="viewer">Viewer — Read-only access</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {state.error && (
+              <p className="text-sm text-destructive font-medium">{state.error}</p>
+            )}
+            <Button type="submit" className="w-full" disabled={pending || !tenantId}>
+              {pending ? "Sending invite..." : "Send Invite"}
+            </Button>
+            {!tenantId && (
+              <p className="text-xs text-muted-foreground text-center">
+                Sign in with Supabase to invite team members.
+              </p>
+            )}
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

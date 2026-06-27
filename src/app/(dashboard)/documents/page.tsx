@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, Search, FileText, Download, Plus, File, Trash2 } from "lucide-react";
+import { Upload, Search, FileText, Download, Plus, File, Trash2, Loader2 } from "lucide-react";
 import {
   DOCUMENT_TYPE_LABELS,
   DOCUMENT_CATEGORY_LABELS,
@@ -37,6 +37,7 @@ import {
 } from "@/lib/constants";
 import type { DocumentCategory } from "@/lib/constants";
 import { useDemoStore, addDocument, deleteDocument } from "@/lib/demo-store";
+import { uploadDocument } from "@/lib/supabase/storage";
 import type { Document } from "@/types/database";
 
 function formatFileSize(bytes: number): string {
@@ -52,20 +53,51 @@ function AddDocumentDialog() {
   const [docType, setDocType] = useState<Document["document_type"]>("other");
   const [linkedProject, setLinkedProject] = useState("");
   const [linkedProperty, setLinkedProperty] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleFileSelect(selectedFile: File) {
+    setFile(selectedFile);
+    if (!name.trim()) {
+      setName(selectedFile.name.replace(/\.[^/.]+$/, ""));
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+
+    let fileUrl = "#";
+    let fileSize = 0;
+    let mimeType = "application/octet-stream";
+
+    if (file) {
+      setUploading(true);
+      const result = await uploadDocument(file, store.tenantId || "general");
+      setUploading(false);
+
+      if (result) {
+        fileUrl = result.url;
+        fileSize = result.size;
+        mimeType = result.mimeType;
+      }
+    }
+
     addDocument({
       name: name.trim(),
       document_type: docType,
       project_id: linkedProject || undefined,
       property_id: linkedProperty || undefined,
+      file_url: fileUrl,
+      file_size: fileSize || (file ? file.size : undefined),
+      mime_type: mimeType || (file ? file.type : undefined),
     });
     setName("");
     setDocType("other");
     setLinkedProject("");
     setLinkedProperty("");
+    setFile(null);
     setOpen(false);
   }
 
@@ -80,6 +112,48 @@ function AddDocumentDialog() {
           <DialogTitle>Upload Document</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* File drop zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const droppedFile = e.dataTransfer.files[0];
+              if (droppedFile) handleFileSelect(droppedFile);
+            }}
+            className={`relative p-6 border-2 border-dashed text-center transition-colors cursor-pointer ${
+              dragOver ? "border-primary bg-primary/5" : file ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20" : "border-border"
+            }`}
+          >
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              onChange={(e) => {
+                const selected = e.target.files?.[0];
+                if (selected) handleFileSelect(selected);
+              }}
+            />
+            {file ? (
+              <div className="flex items-center justify-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-600" />
+                <span className="text-sm font-medium">{file.name}</span>
+                <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(0)} KB)</span>
+              </div>
+            ) : (
+              <>
+                <File className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm text-muted-foreground">
+                  Drop a file here or click to browse
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PDF, DOC, DOCX, JPG, PNG (max 50MB)
+                </p>
+              </>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label>Document Name</Label>
             <Input
@@ -147,15 +221,12 @@ function AddDocumentDialog() {
               </SelectContent>
             </Select>
           </div>
-          <div className="p-4 border-2 border-dashed rounded-lg text-center text-sm text-muted-foreground">
-            <File className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            File upload will work once Supabase Storage is connected.
-            <br />
-            For now, a placeholder document record is created.
-          </div>
-          <Button type="submit" className="w-full">
-            <Plus className="w-4 h-4 mr-1" />
-            Add Document Record
+          <Button type="submit" className="w-full" disabled={uploading}>
+            {uploading ? (
+              <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Uploading...</>
+            ) : (
+              <><Upload className="w-4 h-4 mr-1" /> {file ? "Upload & Save" : "Save Document"}</>
+            )}
           </Button>
         </form>
       </DialogContent>
@@ -312,7 +383,17 @@ export default function DocumentsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={!doc.file_url || doc.file_url === "#"}
+                            onClick={() => {
+                              if (doc.file_url && doc.file_url !== "#") {
+                                window.open(doc.file_url, "_blank");
+                              }
+                            }}
+                          >
                             <Download className="w-3.5 h-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => { if (confirm("Delete this document?")) deleteDocument(doc.id); }}>

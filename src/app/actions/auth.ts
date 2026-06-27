@@ -122,3 +122,74 @@ export async function signup(
 
   redirect("/dashboard");
 }
+
+export interface InviteState {
+  error?: string;
+  success?: boolean;
+}
+
+export async function inviteTeamMember(
+  _prevState: InviteState,
+  formData: FormData
+): Promise<InviteState> {
+  const fullName = (formData.get("full_name") as string)?.trim();
+  const email = (formData.get("email") as string)?.trim();
+  const phone = (formData.get("phone") as string)?.trim();
+  const role = (formData.get("role") as string)?.trim() || "agent";
+  const tenantId = (formData.get("tenant_id") as string)?.trim();
+
+  if (!fullName || !email || !tenantId) {
+    return { error: "Name, email, and tenant are required." };
+  }
+
+  const admin = createAdminClient();
+  if (!admin) {
+    return { error: "Server configuration error." };
+  }
+
+  const tempPassword = `Welcome${Math.random().toString(36).slice(2, 8)}!`;
+
+  const { data: authData, error: authError } = await admin.auth.admin.createUser({
+    email,
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
+  });
+
+  if (authError) {
+    if (authError.message.includes("already been registered")) {
+      return { error: "This email is already registered." };
+    }
+    return { error: authError.message };
+  }
+
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { error: "Failed to create user account." };
+  }
+
+  const { error: profileError } = await admin.from("user_profiles").insert({
+    id: userId,
+    tenant_id: tenantId,
+    email,
+    full_name: fullName,
+    phone: phone || null,
+    role,
+    is_active: true,
+  });
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(userId);
+    return { error: "Failed to create user profile." };
+  }
+
+  // Send password reset so the invited user sets their own password
+  const supabase = await createClient();
+  if (supabase) {
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/login`,
+    });
+  }
+
+  return { success: true };
+}
