@@ -25,23 +25,18 @@ describe("Auth middleware — route protection", () => {
     });
   }
 
-  it("auth guard is currently disabled (commented out)", () => {
-    expect(middlewareSource).toContain(
-      "// if (!user && isDashboardRoute)"
-    );
+  it("auth guard is active — not commented out", () => {
+    expect(middlewareSource).toContain("if (!user && isDashboardRoute)");
+    expect(middlewareSource).not.toMatch(/\/\/\s*if \(!user && isDashboardRoute\)/);
   });
 
   it("redirects to /login with redirect param", () => {
     expect(middlewareSource).toContain('url.pathname = "/login"');
-    expect(middlewareSource).toContain(
-      'url.searchParams.set("redirect"'
-    );
+    expect(middlewareSource).toContain('url.searchParams.set("redirect"');
   });
 
   it("redirects authenticated users away from /login", () => {
-    expect(middlewareSource).toContain(
-      'request.nextUrl.pathname === "/login"'
-    );
+    expect(middlewareSource).toContain('request.nextUrl.pathname === "/login"');
     expect(middlewareSource).toContain('url.pathname = "/dashboard"');
   });
 

@@ -19,12 +19,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Calculator, IndianRupee } from "lucide-react";
-import {
-  formatCurrency,
-  STAMP_DUTY_RATES,
-  REGISTRATION_FEE_RATES,
-} from "@/lib/constants";
+import { formatCurrency, STAMP_DUTY_RATES } from "@/lib/constants";
 import { useDemoStore } from "@/lib/demo-store";
+import { calculateRegistrationCharges } from "@/lib/calculations";
 
 interface RegistrationCalculatorDialogProps {
   propertyValue?: number;
@@ -41,15 +38,17 @@ export function RegistrationCalculatorDialog({
   const [includeGst, setIncludeGst] = useState(false);
 
   const amount = parseFloat(value) || 0;
-  const stampDutyRate = STAMP_DUTY_RATES[selectedState] ?? 6;
-  const registrationRate = REGISTRATION_FEE_RATES[selectedState] ?? 1;
-  const stampDuty = Math.round(amount * stampDutyRate / 100);
-  const registrationFee = Math.round(amount * registrationRate / 100);
-  const gst = includeGst ? Math.round(amount * 5 / 100) : 0;
   const tdsRate = store.settings.tds_percentage;
-  const tds = amount >= 5000000 ? Math.round(amount * tdsRate / 100) : 0;
-  const totalCharges = stampDuty + registrationFee + gst;
-  const grandTotal = amount + totalCharges;
+  const {
+    stampDutyRate,
+    registrationRate,
+    stampDuty,
+    registrationFee,
+    gst,
+    tds,
+    totalCharges,
+    grandTotal,
+  } = calculateRegistrationCharges(amount, selectedState, { includeGst, tdsRatePercent: tdsRate });
 
   const states = Object.keys(STAMP_DUTY_RATES).sort();
 

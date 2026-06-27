@@ -35,6 +35,7 @@ import {
   demoPayments,
 } from "./demo-data";
 import { createClient } from "@/lib/supabase/client";
+import { calculateTds } from "./calculations";
 
 // ── Supabase helper ────────────────────────────────────────
 const supabase = createClient();
@@ -877,8 +878,7 @@ export function addPayment(data: {
 }): Payment {
   const now = new Date().toISOString();
   const booking = store.bookings.find((b) => b.id === data.booking_id);
-  const tdsRate = store.settings.tds_percentage / 100;
-  const tdsAmount = data.amount >= 5000000 ? Math.round(data.amount * tdsRate) : 0;
+  const tdsAmount = calculateTds(data.amount, store.settings.tds_percentage);
 
   const payment: Payment = {
     id: crypto.randomUUID(),
@@ -1156,6 +1156,11 @@ export async function reloadStore() {
   store._loaded = false;
   initPromise = null;
   await initializeStore();
+}
+
+// ── Snapshot (for testing) ──────────────────────────────────
+export function getStoreSnapshot(): Readonly<Store> {
+  return store;
 }
 
 // ── React hook ──────────────────────────────────────────────
