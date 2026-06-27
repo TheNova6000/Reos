@@ -611,6 +611,65 @@ describe("Store — Stats", () => {
     expect(stats.conversionRate).toBeLessThanOrEqual(100);
   });
 
+  it("addDocument with file metadata stores url, size, and mime_type", () => {
+    const doc = addDocument({
+      name: "RERA Certificate",
+      document_type: "rera_certificate",
+      file_url: "https://supabase.co/storage/v1/object/public/documents/tenant-1/cert.pdf",
+      file_size: 245000,
+      mime_type: "application/pdf",
+    });
+
+    expect(doc.name).toBe("RERA Certificate");
+    expect(doc.file_url).toContain("cert.pdf");
+    expect(doc.file_size).toBe(245000);
+    expect(doc.mime_type).toBe("application/pdf");
+    expect(doc.document_type).toBe("rera_certificate");
+    expect(doc.verification_status).toBe("pending");
+
+    const inStore = getStoreSnapshot().documents.find((d) => d.id === doc.id);
+    expect(inStore).toBeDefined();
+    expect(inStore!.file_url).toBe(doc.file_url);
+  });
+
+  it("addDocument without file creates placeholder record", () => {
+    const doc = addDocument({
+      name: "Missing Document",
+      document_type: "other",
+    });
+
+    expect(doc.file_url).toBe("#");
+    expect(doc.file_size).toBeGreaterThan(0);
+    expect(doc.mime_type).toBe("application/pdf");
+  });
+
+  it("addDocument links to project and property", () => {
+    const project = addProject({ name: "Doc Link Test", location: "L", city: "C", state: "S", total_units: 1 });
+    const prop = addProperty({
+      project_id: project.id, plot_number: "DL-01", area: 100,
+      area_unit: "sq_yards", facing: "north", price: 1000000, property_type: "plot",
+    });
+
+    const doc = addDocument({
+      name: "Layout Plan",
+      document_type: "layout_plan",
+      project_id: project.id,
+      property_id: prop.id,
+    });
+
+    expect(doc.project_id).toBe(project.id);
+    expect(doc.property_id).toBe(prop.id);
+  });
+
+  it("deleteDocument removes from store", () => {
+    const doc = addDocument({ name: "To Delete", document_type: "other" });
+    const before = getStoreSnapshot().documents.length;
+    deleteDocument(doc.id);
+    const after = getStoreSnapshot().documents.length;
+    expect(after).toBe(before - 1);
+    expect(getStoreSnapshot().documents.find((d) => d.id === doc.id)).toBeUndefined();
+  });
+
   it("sold count increases after registering a booking", () => {
     const before = getStoreStats();
     const project = addProject({ name: "Stats Sold", location: "L", city: "C", state: "S", total_units: 1 });
