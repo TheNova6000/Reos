@@ -39,14 +39,16 @@ function LoginContent() {
     const code = searchParams.get("code");
     if (!code) return;
 
+    // The middleware already exchanged the code for a session.
+    // We just need to verify the user has an active session.
     const supabase = createClient();
     if (!supabase) return;
 
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (error) {
-        setError("Reset link expired or invalid. Please request a new one.");
-      } else {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
         setNewPasswordMode(true);
+      } else {
+        setError("Reset link expired or invalid. Please request a new one.");
       }
     });
   }, [searchParams]);
