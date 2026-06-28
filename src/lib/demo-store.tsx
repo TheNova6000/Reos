@@ -113,16 +113,21 @@ function saveToLocalStorage() {
       paymentSchedules: store.paymentSchedules,
       settings: store.settings,
     };
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    // quota exceeded or private browsing
+    const json = JSON.stringify(data);
+    localStorage.setItem(LOCAL_STORAGE_KEY, json);
+    console.log("[REOS] localStorage: saved", store.activities.length, "activities,", store.leads.length, "leads", `(${(json.length / 1024).toFixed(0)}KB)`);
+  } catch (err) {
+    console.warn("[REOS] localStorage: save FAILED", err);
   }
 }
 
 function loadFromLocalStorage(): boolean {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) return false;
+    if (!raw) {
+      console.log("[REOS] localStorage: no saved data found");
+      return false;
+    }
     const data = JSON.parse(raw);
     if (data.projects) store.projects = data.projects;
     if (data.properties) store.properties = data.properties;
@@ -133,8 +138,10 @@ function loadFromLocalStorage(): boolean {
     if (data.payments) store.payments = data.payments;
     if (data.paymentSchedules) store.paymentSchedules = data.paymentSchedules;
     if (data.settings) store.settings = data.settings;
+    console.log("[REOS] localStorage: loaded", store.activities.length, "activities,", store.leads.length, "leads");
     return true;
-  } catch {
+  } catch (err) {
+    console.warn("[REOS] localStorage: load failed", err);
     return false;
   }
 }
@@ -216,27 +223,21 @@ export function initializeStore(): Promise<void> {
         client.from("settings").select("*").limit(1),
       ]);
 
-      const hasSupabaseData = [projects, properties, leads, activities, documents, bookings, payments].some(
-        (arr) => arr && arr.length > 0
-      );
-
-      if (hasSupabaseData) {
-        store.projects = (projects as Project[]) || [];
-        store.properties = (properties as Property[]) || [];
-        store.leads = (leads as Lead[]) || [];
-        store.activities = (activities as Activity[]) || [];
-        store.documents = (documents as Document[]) || [];
-        store.bookings = (bookings as Booking[]) || [];
-        store.payments = (payments as Payment[]) || [];
-        store.paymentSchedules = (paymentSchedules as PaymentSchedule[]) || [];
-        if (settingsRows && settingsRows.length > 0) {
-          store.settings = settingsRows[0] as Settings;
-        }
-        console.log("[REOS] Store loaded from Supabase", store.tenantId ? `(tenant: ${store.tenantId})` : "");
-      } else {
-        loadFromLocalStorage();
-        console.log("[REOS] Supabase empty — loaded from localStorage + demo data");
-      }
+      // Per-table merge: only overwrite store with Supabase data for tables that
+      // actually have content. Empty tables keep whatever the store already has
+      // (demo data or localStorage). This prevents Supabase from wiping local data
+      // when some tables are seeded but others aren't.
+      loadFromLocalStorage();
+      if (projects && projects.length > 0) store.projects = projects as Project[];
+      if (properties && properties.length > 0) store.properties = properties as Property[];
+      if (leads && leads.length > 0) store.leads = leads as Lead[];
+      if (activities && activities.length > 0) store.activities = activities as Activity[];
+      if (documents && documents.length > 0) store.documents = documents as Document[];
+      if (bookings && bookings.length > 0) store.bookings = bookings as Booking[];
+      if (payments && payments.length > 0) store.payments = payments as Payment[];
+      if (paymentSchedules && paymentSchedules.length > 0) store.paymentSchedules = paymentSchedules as PaymentSchedule[];
+      if (settingsRows && settingsRows.length > 0) store.settings = settingsRows[0] as Settings;
+      console.log("[REOS] Store loaded — Supabase + localStorage merge", store.tenantId ? `(tenant: ${store.tenantId})` : "");
       store._loaded = true;
       emitChange();
       initializeRealtime();
