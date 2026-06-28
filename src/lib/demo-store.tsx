@@ -174,6 +174,7 @@ export function initializeStore(): Promise<void> {
     loadFromLocalStorage();
     useLocalFallback = true;
     store._loaded = true;
+    emitChange();
     return Promise.resolve();
   }
 
@@ -246,6 +247,7 @@ export function initializeStore(): Promise<void> {
       loadFromLocalStorage();
       useLocalFallback = true;
       store._loaded = true;
+      emitChange();
     }
   })();
 
