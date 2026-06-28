@@ -40,6 +40,12 @@ describe("Auth middleware — route protection", () => {
     expect(middlewareSource).toContain('url.pathname = "/dashboard"');
   });
 
+  it("does NOT redirect from /login when password reset code is present", () => {
+    expect(middlewareSource).toContain('hasResetCode');
+    expect(middlewareSource).toContain('!hasResetCode');
+    expect(middlewareSource).toContain('.has("code")');
+  });
+
   it("skips auth when Supabase is not configured", () => {
     expect(middlewareSource).toContain("your-supabase-url-here");
     expect(middlewareSource).toContain("return supabaseResponse");

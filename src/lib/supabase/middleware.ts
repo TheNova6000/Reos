@@ -52,7 +52,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && request.nextUrl.pathname === "/login") {
+  const hasResetCode = request.nextUrl.searchParams.has("code");
+  if (user && request.nextUrl.pathname === "/login" && !hasResetCode) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
