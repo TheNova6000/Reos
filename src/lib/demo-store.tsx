@@ -144,7 +144,9 @@ let useLocalFallback = false;
 function emitChange() {
   store = { ...store };
   listeners.forEach((l) => l());
-  if (useLocalFallback) {
+  // Always save to localStorage as a safety net — even when Supabase is connected.
+  // If Supabase persist() fails silently, localStorage ensures data survives reload.
+  if (typeof window !== "undefined") {
     saveToLocalStorage();
   }
 }
@@ -214,21 +216,30 @@ export function initializeStore(): Promise<void> {
         client.from("settings").select("*").limit(1),
       ]);
 
-      store.projects = (projects as Project[]) || [];
-      store.properties = (properties as Property[]) || [];
-      store.leads = (leads as Lead[]) || [];
-      store.activities = (activities as Activity[]) || [];
-      store.documents = (documents as Document[]) || [];
-      store.bookings = (bookings as Booking[]) || [];
-      store.payments = (payments as Payment[]) || [];
-      store.paymentSchedules = (paymentSchedules as PaymentSchedule[]) || [];
-      if (settingsRows && settingsRows.length > 0) {
-        store.settings = settingsRows[0] as Settings;
+      const hasSupabaseData = [projects, properties, leads, activities, documents, bookings, payments].some(
+        (arr) => arr && arr.length > 0
+      );
+
+      if (hasSupabaseData) {
+        store.projects = (projects as Project[]) || [];
+        store.properties = (properties as Property[]) || [];
+        store.leads = (leads as Lead[]) || [];
+        store.activities = (activities as Activity[]) || [];
+        store.documents = (documents as Document[]) || [];
+        store.bookings = (bookings as Booking[]) || [];
+        store.payments = (payments as Payment[]) || [];
+        store.paymentSchedules = (paymentSchedules as PaymentSchedule[]) || [];
+        if (settingsRows && settingsRows.length > 0) {
+          store.settings = settingsRows[0] as Settings;
+        }
+        console.log("[REOS] Store loaded from Supabase", store.tenantId ? `(tenant: ${store.tenantId})` : "");
+      } else {
+        loadFromLocalStorage();
+        console.log("[REOS] Supabase empty — loaded from localStorage + demo data");
       }
       store._loaded = true;
       emitChange();
       initializeRealtime();
-      console.log("[REOS] Store loaded from Supabase", store.tenantId ? `(tenant: ${store.tenantId})` : "");
     } catch (err) {
       console.warn("[REOS] Supabase load failed, falling back to localStorage + demo data:", err);
       loadFromLocalStorage();
