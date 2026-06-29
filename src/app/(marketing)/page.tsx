@@ -41,7 +41,7 @@ export default function ReosHomePage() {
         <div className="absolute inset-0 -z-10">
           <GLSLHillsBackground speed={0.3} cameraZ={140} />
         </div>
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 text-center flex flex-col items-center">
           <AnimateOnScroll animation="fade-up" stagger={0.1}>
             <div className="inline-block border-2 border-primary bg-primary/10 px-4 py-1.5 mb-8 brutal-shadow-red">
               <span className="text-xs font-black uppercase tracking-widest text-primary">Real Estate Operating System</span>
