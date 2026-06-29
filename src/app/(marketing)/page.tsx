@@ -53,12 +53,12 @@ export default function ReosHomePage() {
               <br />
               Everything managed.
             </h1>
-            <p className="mt-8 text-lg md:text-xl text-muted-foreground max-w-2xl font-medium">
+            <p className="mt-8 text-lg md:text-xl text-muted-foreground max-w-2xl font-medium text-center">
               REOS gives real estate companies a management dashboard and a branded
               website — bundled. Add a property in the dashboard, it appears on your site.
               No developers needed.
             </p>
-            <div className="mt-10 flex flex-col sm:flex-row gap-4">
+            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 size="lg"
                 nativeButton={false}
