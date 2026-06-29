@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { AnimateOnScroll } from "@/components/effects/animate-on-scroll";
+import { GLSLHillsBackground } from "@/components/effects/glsl-hills-dynamic";
 import {
   Building2, Users, FileText, BarChart3, ShieldCheck, Globe,
   ArrowRight, MessageSquare, CreditCard, Search,
@@ -37,7 +38,9 @@ export default function ReosHomePage() {
     <>
       {/* HERO */}
       <section className="relative py-28 md:py-44 overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-[repeating-linear-gradient(45deg,transparent,transparent_40px,oklch(0.60_0.24_27_/_3%)_40px,oklch(0.60_0.24_27_/_3%)_41px)]" />
+        <div className="absolute inset-0 -z-10">
+          <GLSLHillsBackground speed={0.3} cameraZ={140} />
+        </div>
         <div className="container mx-auto px-4">
           <AnimateOnScroll animation="fade-up" stagger={0.1}>
             <div className="inline-block border-2 border-primary bg-primary/10 px-4 py-1.5 mb-8 brutal-shadow-red">
